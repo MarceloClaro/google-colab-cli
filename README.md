@@ -190,3 +190,34 @@ To view interactive walkthroughs of eleven real-world automated scenarios, check
 ## Contributing
 
 Feedback and contributions are welcome! Please read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for details.
+
+
+## QCAF Notebook Generation
+
+This fork adds `colab qcaf-notebook` for generating reproducible Google Colab notebooks from a QCAF request JSON file.
+
+Generate a hybrid PennyLane/Qiskit notebook:
+
+```bash
+colab qcaf-notebook qcaf_request.json \
+  --framework hybrid \
+  -o QCAF_experiment.ipynb
+```
+
+Generate and execute it in an existing Colab session:
+
+```bash
+colab qcaf-notebook qcaf_request.json \
+  --framework hybrid \
+  -o QCAF_experiment.ipynb \
+  --execute \
+  -s analysis
+```
+
+The generated notebook installs MiniZinc and the QCAF MCP package, embeds the complete request payload, executes bounded admissibility analysis, and prints the interpretation boundary required for scientifically cautious reporting.
+
+You can also execute any generated notebook later with the existing command:
+
+```bash
+colab exec -s analysis -f QCAF_experiment.ipynb
+```
