@@ -24,7 +24,7 @@ def _read_request(path: Path) -> dict:
     except FileNotFoundError:
         raise typer.BadParameter(f"Request file not found: {path}")
     except json.JSONDecodeError as exc:
-        raise typer.BadParameter(f"Request file is not valid JSON: {exc}")
+        raise typer.BadParameter(f"Request file is not valid JSON: {exc}") from exc
 
     if not isinstance(payload, dict):
         raise typer.BadParameter("QCAF request must be a JSON object")
@@ -44,7 +44,13 @@ def build_qcaf_notebook(
     repository: str,
     repository_ref: str,
 ):
-    if framework not in ALLOWED_FRAMEWORKS:\n        raise ValueError(\n            f"framework must be one of: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"\n        )\n\n    extras = []
+    framework = framework.lower().strip()
+    if framework not in ALLOWED_FRAMEWORKS:
+        raise ValueError(
+            f"framework must be one of: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"
+        )
+
+    extras = []
     if framework in ("pennylane", "hybrid"):
         extras.append("pennylane")
     if framework in ("qiskit", "hybrid"):
@@ -53,6 +59,7 @@ def build_qcaf_notebook(
     git_url = f"git+https://github.com/{repository}.git@{repository_ref}"
     packages = " ".join([git_url, *extras])
     payload_json = json.dumps(payload, indent=2, ensure_ascii=False)
+    payload_literal = repr(payload_json)
 
     cells = [
         new_markdown_cell(
@@ -68,24 +75,28 @@ Framework profile: {framework}.
 """
         ),
         new_code_cell(
-            "# @title Install QCAF and scientific dependencies\n"
-            "!apt-get -qq update >/dev/null\n"
-            "!apt-get -qq install -y minizinc >/dev/null\n"
-            f"%pip -q install {packages}\n"
-            "print('QCAF environment ready.')"
+            f"""# @title Install QCAF and scientific dependencies
+!apt-get -qq update >/dev/null
+!apt-get -qq install -y minizinc >/dev/null
+%pip -q install {packages}
+print("QCAF environment ready.")
+"""
         ),
         new_code_cell(
-            "# @title Load QCAF\n"
-            "import json\n"
-            "from pprint import pprint\n"
-            "from main import quantum_admissibility_core\n"
-            "from qcaf import QuantumAdmissibilityRequest"
+            """# @title Load QCAF
+import json
+from pprint import pprint
+
+from main import quantum_admissibility_core
+from qcaf import QuantumAdmissibilityRequest
+"""
         ),
         new_code_cell(
-            "# @title Reproducible QCAF request\n"
-            f"request_payload = json.loads(r'''{payload_json}''')\n"
-            "qcaf_request = QuantumAdmissibilityRequest(**request_payload)\n"
-            "pprint(request_payload)"
+            f"""# @title Reproducible QCAF request
+request_payload = json.loads({payload_literal})
+qcaf_request = QuantumAdmissibilityRequest(**request_payload)
+pprint(request_payload)
+"""
         ),
     ]
 
@@ -116,25 +127,29 @@ append each run to request_payload["observations"].
     cells.extend(
         [
             new_code_cell(
-                "# @title Solve bounded quantum admissibility\n"
-                "result = await quantum_admissibility_core(qcaf_request)\n"
-                "result_data = result.model_dump() if hasattr(result, 'model_dump') else result.dict()\n"
-                "pprint(result_data)"
+                """# @title Solve bounded quantum admissibility
+result = await quantum_admissibility_core(qcaf_request)
+result_data = result.model_dump() if hasattr(result, "model_dump") else result.dict()
+pprint(result_data)
+"""
             ),
             new_code_cell(
-                "# @title Publication-oriented interpretation\n"
-                "print('Admissibility:', result.admissibility)\n"
-                "print('Solver status:', result.solver_status)\n"
-                "print('Objective:', result.objective)\n"
-                "print('Interpretation boundary:')\n"
-                "print(result.interpretation_boundary)\n"
-                "if result.selected_observation is not None:\n"
-                "    print('
-Selected witness:')\n"
-                "    selected = (result.selected_observation.model_dump()\n"
-                "                if hasattr(result.selected_observation, 'model_dump')\n"
-                "                else result.selected_observation.dict())\n"
-                "    pprint(selected)"
+                """# @title Publication-oriented interpretation
+print("Admissibility:", result.admissibility)
+print("Solver status:", result.solver_status)
+print("Objective:", result.objective)
+print("Interpretation boundary:")
+print(result.interpretation_boundary)
+
+if result.selected_observation is not None:
+    print("\\nSelected witness:")
+    selected = (
+        result.selected_observation.model_dump()
+        if hasattr(result.selected_observation, "model_dump")
+        else result.selected_observation.dict()
+    )
+    pprint(selected)
+"""
             ),
         ]
     )
@@ -201,6 +216,7 @@ def qcaf_notebook_command(
         raise typer.BadParameter(
             f"--framework must be one of: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"
         )
+
     notebook = build_qcaf_notebook(
         payload,
         title=title,
