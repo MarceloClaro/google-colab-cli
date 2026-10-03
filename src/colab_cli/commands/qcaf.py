@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
 import nbformat
 import typer
 from nbformat.v4 import new_code_cell, new_markdown_cell, new_notebook
 from typing_extensions import Annotated
 
-Framework = Literal["qcaf", "pennylane", "qiskit", "hybrid"]
+ALLOWED_FRAMEWORKS = {"qcaf", "pennylane", "qiskit", "hybrid"}
 
 
 def _slugify(value: str) -> str:
@@ -40,11 +40,11 @@ def build_qcaf_notebook(
     payload: dict,
     *,
     title: str,
-    framework: Framework,
+    framework: str,
     repository: str,
     repository_ref: str,
 ):
-    extras = []
+    if framework not in ALLOWED_FRAMEWORKS:\n        raise ValueError(\n            f"framework must be one of: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"\n        )\n\n    extras = []
     if framework in ("pennylane", "hybrid"):
         extras.append("pennylane")
     if framework in ("qiskit", "hybrid"):
@@ -129,7 +129,8 @@ append each run to request_payload["observations"].
                 "print('Interpretation boundary:')\n"
                 "print(result.interpretation_boundary)\n"
                 "if result.selected_observation is not None:\n"
-                "    print('\\nSelected witness:')\n"
+                "    print('
+Selected witness:')\n"
                 "    selected = (result.selected_observation.model_dump()\n"
                 "                if hasattr(result.selected_observation, 'model_dump')\n"
                 "                else result.selected_observation.dict())\n"
@@ -165,7 +166,7 @@ def qcaf_notebook_command(
         typer.Option("--title", help="Notebook title."),
     ] = "QCAF Quantum Admissibility Experiment",
     framework: Annotated[
-        Framework,
+        str,
         typer.Option(
             "--framework",
             help="Notebook integration profile: qcaf, pennylane, qiskit, or hybrid.",
@@ -195,6 +196,11 @@ def qcaf_notebook_command(
     """Generate a reproducible QCAF Google Colab notebook."""
 
     payload = _read_request(request)
+    framework = framework.lower().strip()
+    if framework not in ALLOWED_FRAMEWORKS:
+        raise typer.BadParameter(
+            f"--framework must be one of: {', '.join(sorted(ALLOWED_FRAMEWORKS))}"
+        )
     notebook = build_qcaf_notebook(
         payload,
         title=title,
